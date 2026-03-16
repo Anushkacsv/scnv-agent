@@ -10,10 +10,21 @@ class ChatRequest(BaseModel):
     message: str
     session_id: str | None = None
 
+#helper function to tell orchestrator which agent to run
+
+def _detect_event_type(message: str) -> str:
+    msg = message.lower()
+    if any(k in msg for k in ["optimize", "best route", "reroute"]):
+        return "optimize_request"
+    if any(k in msg for k in ["sto", "classify", "transfer", "movement"]):
+        return "sto_event"
+    return "user_query"
+
 class SessionSaveRequest(BaseModel):
     session_id: str
     title: str
     messages: list
+    agent_id: str | None = None
 
 SESSIONS_DB = {}
 
@@ -49,8 +60,10 @@ async def chat(req: ChatRequest):
             "sku_id": "Laptops-X1" if "laptop" in query_lower else "Unknown",
             "quantity": 50
         }
-        final_state = orchestrator.process_sto_event(dummy_sto)
-        sources = final_state.get('graph_context', [])
+        # detect user intent and route msg to correct agent
+        # orchestrator has process_sto_event; route() existed as older API.
+        final_state_state = orchestrator.process_sto_event(dummy_sto)
+        sources = final_state_state.graph_context if hasattr(final_state_state, 'graph_context') else []
         if not sources:
             sources.append({
                 "type": "neo4j",
@@ -58,7 +71,7 @@ async def chat(req: ChatRequest):
                 "confidence": 0.5,
                 "text_snippet": "No distinct alternative graphs resolved."
             })
-        answer = f"LangGraph STO Analysis complete. Classification: {final_state.get('classification')}. Confidence: {final_state.get('confidence')}. Reasoning: {final_state.get('reasoning_text')}"
+        answer = f"LangGraph STO Analysis complete. Classification: {final_state_state.classification}. Confidence: {final_state_state.confidence}. Reasoning: {final_state_state.reasoning_text}"
         return {"answer": answer, "sources": sources}
     else:
         # It's a general question/chat, use standard Conversational LLM or SQL Agent
@@ -101,19 +114,25 @@ async def chat(req: ChatRequest):
             return {"answer": f"Chat Engine failed: {str(e)}", "sources": []}
 
 @router.get("/sessions")
-async def get_sessions():
-    return {
-        "sessions": [
-            {"id": str(sid), "timestamp": data["timestamp"], "title": data["title"]}
-            for sid, data in SESSIONS_DB.items()
-        ]
-    }
+async def get_sessions(agent_id: str | None = None):
+    results = []
+    for sid, data in SESSIONS_DB.items():
+        if agent_id and data.get("agent_id") != agent_id:
+            continue
+        results.append({
+            "id": str(sid),
+            "timestamp": data["timestamp"],
+            "title": data["title"],
+            "agent_id": data.get("agent_id")
+        })
+    return {"sessions": results}
 
 @router.post("/sessions/new")
 async def save_session(req: SessionSaveRequest):
     SESSIONS_DB[req.session_id] = {
         "title": req.title,
         "messages": req.messages,
+        "agent_id": req.agent_id,
         "timestamp": datetime.datetime.now().isoformat()
     }
     return {"status": "saved"}

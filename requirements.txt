@@ -14,6 +14,7 @@ langchain-community==0.3.0
 sqlalchemy==2.0.36
 psycopg2-binary==2.9.10
 pgvector==0.3.6
+neo4j==6.1.0
 
 # ── Optimization ──
 ortools==9.11.4210
@@ -21,3 +22,5 @@ ortools==9.11.4210
 # ── Utilities ──
 python-dotenv==1.0.1
 httpx==0.28.1
+python-multipart==0.0.12
+PyJWT==2.10.1

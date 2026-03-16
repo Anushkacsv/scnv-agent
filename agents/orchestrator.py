@@ -32,8 +32,8 @@ class Orchestrator:
         # Build the graph
         self.workflow = StateGraph(AgentState)
         
-        # Add Nodes
-        self.workflow.add_node("graph_context", self.neo4j_node.retrieve_graph_context)
+        # Add Nodes (avoid naming collisions with state keys)
+        self.workflow.add_node("neo4j_context", self.neo4j_node.retrieve_graph_context)
         self.workflow.add_node("scm_analyst", self.scm_analyst.invoke)
         self.workflow.add_node("process_mining", self.process_mining.invoke)
         self.workflow.add_node("optimizer", self.optimizer.invoke)
@@ -41,8 +41,8 @@ class Orchestrator:
         
         # Define Edges / Routing
         # Start by querying Neo4j for network relationships
-        self.workflow.set_entry_point("graph_context")
-        self.workflow.add_edge("graph_context", "scm_analyst")
+        self.workflow.set_entry_point("neo4j_context")
+        self.workflow.add_edge("neo4j_context", "scm_analyst")
         
         # From SCM Analyst, determine if we need Tier 2 LLM or if we can proceed to Optimizer/Mining
         self.workflow.add_conditional_edges(

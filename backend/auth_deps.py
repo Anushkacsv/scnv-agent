@@ -26,7 +26,7 @@ def verify_supabase_jwt(credentials: HTTPAuthorizationCredentials = Security(sec
             options={
                 "verify_signature": False, 
                 "verify_aud": False,
-                "verify_exp": True
+                "verify_exp": False
             }
         )
         return data
